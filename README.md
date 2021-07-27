@@ -146,3 +146,73 @@ However, we have added [higher-level constructs](https://docs.aws.amazon.com/cdk
 1. Run `cdk bootstrap` to create an S3 artifact bucket CDK needs
 1. Deploy that with a `cdk deploy` to build our container locally, generate the CloudFormation template as above (as well upload it to the artifact bucket) and then call the AWS APIs to deploy that CloudFormation template. As part of that the local cdk CLI will also push the local image it (re)builds up to the new ECR it creates as part of that process as well.
 1. Answer `y` to the security confirmation and press Enter (it will show you any IAM and Security Group/firewall changes that will happen if you proceed)
+
+(Optional from here)
+Windows Containers
+Local Windows Example
+
+First we'll show how to build an IIS container to host nyancat on Windows instead of our nginx container we used on Linux as well as the local Docker experience on Windows. We'll spin up a Windows bastion host to test this on - but the Docker experience should be similar to that on your Windows laptop/desktop.
+
+Create and log into a Windows EC2 Instance:
+
+    Go to the EC2 Service in the AWS Console
+    Go to Instances on the navigation pane on the left side
+    Click the orange Launch instances button in the upper right
+    In the search box type container and press Enter then click the blue Select button next to `Microsoft Windows Server 2019 Base with Containers
+    Choose the t3.large instance type in the list and once that is selected click the Review and Launch button
+    Click the Launch button then Create a new key pair from the dropdown then enter the name workshop-windows-bastion and click Download Key Pair
+    Then click the blue Launch Instances button
+    Go back to the EC2 Instances view and tick the new instance there to select it
+    Click Actions -> Security -> Modify IAM Role then choose EC2FullAdmin and click Save
+    Click the Connect button then choose the RDP client tab then click the Download remote desktop file button and then click Get password
+    Browse to the certificate file you just downloaded and click Decrypt Password
+    Copy the Password that has been revealed to your clipboard and then open the .RDP file you downloaded to log into the Windows Bastion
+
+Use Windows Docker locally on the instance:
+
+    Open PowerShell
+    Run docker version to see that Docker for Windows is built-in to this AMI and ready to go
+    Run docker run --rm -d --name iis -p 8080:80 mcr.microsoft.com/windows/servercore/iis to run stock IIS
+    Note how huge the image is and how long it takes it to both download and extract - 1/2 of Windows needs to be within the Windows container images and this makes them slow to pull/start/scale/heal compared to Linux
+    Open Internet Explorer and Go to http://localhost:8080. You will see the default IIS site
+    Run docker stop iis to stop the container
+
+Now lets launch the nyancat content:
+
+    In PowerShell
+    Run Invoke-WebRequest -uri "https://github.com/jasonumiker/docker-ecs-immersion/raw/main/nyancat-windows.zip" -Method "GET" -Outfile nyancat-windows.zip
+    Unzip the files. Run Expand-Archive -Path nyancat-windows.zip -DestinationPath C:\nyancat-windows
+    Run cd c:\nyancat-windows
+    Run cat Dockerfile and see how Dockerfiles on Windows are similar but you use Powershell instead of the unix shell
+    Run docker build -t nyancat-windows . to delete the default site and put our nyancat in its place
+    Note how since we had already download the IIS base layers we are building on they were cached really speeding things up
+    Run docker run --rm -d --name nyancat-windows -p 8080:80 nyancat-windows to run our nycat on Windows via IIS
+    Go to http://localhost:8080 in IE and see it running
+    Run docker stop nyancat-windows to stop the container
+
+Push our new nyancat-windows image to ECR:
+
+    Install the AWS CLI by running msiexec.exe /i https://awscli.amazonaws.com/AWSCLIV2.msi in Powershell
+    Restart Powershell so the AWS CLI is now in the PATH
+    Run cd c:\nyancat-windows
+    Go to the AWS Console and go to the Elastic Container Registry (Amazon ECR)
+    Click the orange Get Started button
+    Type nyancat-windows for the repository name then click Create repository
+    Enter the repository then click the View push commands button in the top right of the scree
+    Select the Windows Tab
+    Copy the first command and paste into PowerShell in your RDP session. This will log in
+    Copy and paste the third command to re-tag our image (we already did the build in step 2)
+    Copy and paste the fourth command to push the image
+
+Windows ECS Example
+
+Now we'll take our nyancat container and run it on ECS
+
+Go back to your terminal in Cloud9 and:
+
+    Run nvm install --lts to switch back to the lts version we installed above (since it is already installed this should be quick)
+    Run cd ~/environment/docker-ecs-immersion/windows
+    Run pip install -r requirements.txt to install the necessary python packages from pip.
+    Run cdk deploy
+    Go to the ALB address output at the end of the deployment to see our nyancat hosted by IIS on Windows via ECS
+
