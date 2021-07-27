@@ -148,8 +148,9 @@ However, we have added [higher-level constructs](https://docs.aws.amazon.com/cdk
 1. Answer `y` to the security confirmation and press Enter (it will show you any IAM and Security Group/firewall changes that will happen if you proceed)
 
 (Optional from here)
-Windows Containers
-Local Windows Example
+## Windows Containers
+
+###Local Windows Example
 
 First we'll show how to build an IIS container to host nyancat on Windows instead of our nginx container we used on Linux as well as the local Docker experience on Windows. We'll spin up a Windows bastion host to test this on - but the Docker experience should be similar to that on your Windows laptop/desktop.
 
@@ -204,7 +205,7 @@ Push our new nyancat-windows image to ECR:
    1. Copy and paste the third command to re-tag our image (we already did the build in step 2)
    1. Copy and paste the fourth command to push the image
 
-Windows ECS Example
+## Windows ECS Example
 
 Now we'll take our nyancat container and run it on ECS
 
