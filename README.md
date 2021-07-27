@@ -114,8 +114,6 @@ Then go back to the Terminal tab in our Cloud9 and:
 
 This was all actually done via CloudFormation and you can go to the CloudFormation service in the AWS Console and see separate stacks for the application, for the environment and for the service. If you go into those you can see the Templates that copilot generated and deployed for you. If you choose not not use copilot then you can be inspired by these Templates to make your own to manage ECS directly.
 
-TODO: Give them a tour around the ECS and EC2 service consoles all the things that were provisioned (ECS Cluster/Service/Tasks, ALB, etc.)
-
 ### AWS Copilot CI/CD Pipeline
 
 Rather than building our container on the machine that we run copilot CLI from (our laptop etc.), [copilot can set up a CI/CD pipeline in the cloud based on AWS CodePipeline/CodeBuild for us too](https://aws.github.io/copilot-cli/docs/concepts/pipelines/).
@@ -124,9 +122,6 @@ Rather than building our container on the machine that we run copilot CLI from (
 1. Press Enter to accept the `dev` environment default
 1. Press Enter to accept the repository
 1. Note the `buildspec.yml` and `pipeline.yml` files that it generated - have a look at them.
-1. (Don't actually run this) If you were to run `copilot pipeline update` it would deploy that pipeline for you from those files - but you'd have to administrative permissions to the git repo to both pull it as well as create the webhook(s) to trigger the builds whenever you merge. Rather than walk you through creating a GitHub account and doing it take our word for it.
-
-[(Optional) Demo this for the attendees if they'd like to see it]
 
 ### AWS Cloud Development Kit (CDK)
 
@@ -151,138 +146,3 @@ However, we have added [higher-level constructs](https://docs.aws.amazon.com/cdk
 1. Run `cdk bootstrap` to create an S3 artifact bucket CDK needs
 1. Deploy that with a `cdk deploy` to build our container locally, generate the CloudFormation template as above (as well upload it to the artifact bucket) and then call the AWS APIs to deploy that CloudFormation template. As part of that the local cdk CLI will also push the local image it (re)builds up to the new ECR it creates as part of that process as well.
 1. Answer `y` to the security confirmation and press Enter (it will show you any IAM and Security Group/firewall changes that will happen if you proceed)
-
-## Windows Containers
-
-### Local Windows Example
-
-First we'll show how to build an IIS container to host nyancat on Windows instead of our nginx container we used on Linux as well as the local Docker experience on Windows. We'll spin up a Windows bastion host to test this on - but the Docker experience should be similar to that on your Windows laptop/desktop.
-
-Create and log into a Windows EC2 Instance:
-1. Go to the EC2 Service in the AWS Console
-1. Go to `Instances` on the navigation pane on the left side
-1. Click the orange `Launch instances` button in the upper right
-1. In the search box type `container` and press Enter then click the blue `Select` button next to `Microsoft Windows Server 2019 Base with Containers
-1. Choose the `t3.large` instance type in the list and once that is selected click the `Review and Launch` button
-1. Click the `Launch button` then `Create a new key pair` from the dropdown then enter the name `workshop-windows-bastion` and click `Download Key Pair`
-1. Then click the blue `Launch Instances` button
-1. Go back to the EC2 Instances view and tick the new instance there to select it
-1. Click `Actions` -> `Security` -> `Modify IAM Role` then choose `EC2FullAdmin` and click `Save`
-1. Click the `Connect` button then choose the `RDP client` tab then click the `Download remote desktop file` button and then click `Get password`
-1. Browse to the certificate file you just downloaded and click `Decrypt Password`
-1. Copy the Password that has been revealed to your clipboard and then open the .RDP file you downloaded to log into the Windows Bastion
-
-Use Windows Docker locally on the instance:
-1. Open PowerShell
-1. Run `docker version` to see that Docker for Windows is built-in to this AMI and ready to go
-1. Run `docker run --rm -d --name iis -p 8080:80 mcr.microsoft.com/windows/servercore/iis` to run stock IIS
-1. Note how huge the image is and how long it takes it to both download and extract - 1/2 of Windows needs to be within the Windows container images and this makes them slow to pull/start/scale/heal compared to Linux
-1. Open Internet Explorer and Go to `http://localhost:8080`. You will see the default IIS site
-1. Run `docker stop iis` to stop the container
-
- Now lets launch the nyancat content:
-1. In PowerShell
-1. Run `Invoke-WebRequest -uri "https://github.com/jasonumiker/docker-ecs-immersion/raw/main/nyancat-windows.zip" -Method "GET"  -Outfile nyancat-windows.zip`
-1. Unzip the files. Run `Expand-Archive -Path nyancat-windows.zip -DestinationPath C:\nyancat-windows`
-1. Run `cd c:\nyancat-windows`
-1. Run `cat Dockerfile` and see how Dockerfiles on Windows are similar but you use Powershell instead of the unix shell
-1. Run `docker build -t nyancat-windows .` to delete the default site and put our nyancat in its place
-1. Note how since we had already download the IIS base layers we are building on they were cached really speeding things up
-1. Run `docker run --rm -d --name nyancat-windows -p 8080:80 nyancat-windows` to run our nycat on Windows via IIS
-1. Go to `http://localhost:8080` in IE and see it running
-1. Run `docker stop nyancat-windows` to stop the container
-
-Push our new nyancat-windows image to ECR:
-1. Install the AWS CLI by running `msiexec.exe /i https://awscli.amazonaws.com/AWSCLIV2.msi` in Powershell
-1. Restart Powershell so the AWS CLI is now in the PATH
-1. Run `cd c:\nyancat-windows`
-1. Go to the AWS Console and go to the Elastic Container Registry (Amazon ECR)
-1. Click the orange `Get Started` button
-1. Type `nyancat-windows` for the repository name then click `Create repository`
-1. Enter the repository then click the `View push commands` button in the top right of the scree
-1. Select the Windows Tab
-1. Copy the first command and paste into PowerShell in your RDP session. This will log in
-1. Copy and paste the third command to re-tag our image (we already did the build in step 2)
-1. Copy and paste the fourth command to push the image
-
-### Windows ECS Example
-
-Now we'll take our nyancat container and run it on ECS
-
-Go back to your terminal in Cloud9 and:
-1. Run `nvm install --lts` to switch back to the lts version we installed above (since it is already installed this should be quick)
-1. Run `cd ~/environment/docker-ecs-immersion/windows`
-1. Run `pip install -r requirements.txt` to install the necessary python packages from pip.
-1. Run `cdk deploy`
-1. Go to the ALB address output at the end of the deployment to see our nyancat hosted by IIS on Windows via ECS
-
-## ECS Anywhere
-
-In order to run ECS Anywhere you need a machine with systemd and Docker. This could be anything from bare metal on a raspberry pi to a VM to even Docker-in-Docker.
-
-The easiest way to test this is using Docker-in-Docker on the Cloud9 that we've already been using Docker on.
-
-The Dockerfile in the ecsanywhere folder will build an Amazon Linux 2 container that has both systemd and docker that can serve as an ECS Anywhere sandbox for us.
-
-On the Cloud9:
-1. We need to free some disk space before proceeding as the Cloud9 only has 10GB - there are a number of unneeded docker images pre-loaded on the Cloud9 that we can clean to do that. Run `docker rmi -f $(docker images -a -q)` which will remove all the locally cached images.
-1. `cd ~/environment/docker-ecs-immersion/ecsanywhere`
-1. `docker build -t ecsanywhere-dind .`
-1. `docker run -d --privileged --name ecsanywhere -p 8080-8090:8080-8090 ecsanywhere-dind:latest`
-1. `docker exec -it ecsanywhere /bin/bash`
-
-We'll paste the command to join this to Systems manager and ECS into that interactive shell within the container in a moment.
-
-Then in the AWS Console:
-1. Go to the ECS Service
-1. Click the blue `Create Cluster` button
-1. Choose Networking only (should already be selected by default) and click the blue `Next step` button
-1. Type `ECSAnywhere` for the Cluster name, click the box to enable CloudWatch Container Insights, and then click the blue `Create` button
-1. Click the blue `View Cluster` button
-1. Go to the ECS Instances tab in the middle of hhe console
-1. Click the `Register External Instances` button
-1. Click the blue `Next step` button
-1. Click the blue `Copy` button to copy the command we need to the clipboard
-
-Then just paste that command in to the interactive shell within our ecsanywhere-dind container to register this container against both SSM and ECS Anywhere.
-
-Once you have started the container you can do a `docker stop ecsanywhere` to pause it and `docker start ecsanywhere` to start it up again when you need - it'll retain the ECS cluster membership until you do a `docker rm` and remove the container from your system.
-
-To remove it from both SSM and ECS Anywhere go to the Fleet Manager in the SMS service and deregister it there.
-
-But we'll leave it up and running for now to show deploying a Task to it.
-
-### Deploying nyancat to our ECS Anywhere
-
-We already had pushed our Linux nyancat image twice - one with copilot and once with CDK. So we'll use that image. But we'll create a new Task Definition and Service manually in the console and to deploy it to our ECS Anywhere Docker-in-Docker environment.
-
-First we'll find the image URI in the ECR console:
-1. Go to the ECR service in the AWS Console
-1. Click on the blue name/link for `nyancat/www`
-1. Click on the squares to the left of the URI for `nyancat-www` to copy the URI path to the right of the squares - or highlight the path and copy it yourself.
-
-Then we'll deploy it to ECS Anywhere:
-1. Go to the ECS Service in the AWS Console
-1. Go to Task Definitions on the Left Hand pane
-1. Click on the blue `Create new Task Definition` button
-1. Choose `EXTERNAL` and then click the `Next step` button
-1. Enter `nyancat-external` for the Task Definition Name
-1. Choose `nyancat-dev-www-TaskRole` for the Task Role dropdown
-1. Choose `nyancat-dev-www-ExecutionRole` for the Task execution role
-1. Click the blue `Add container` button
-1. Paste in the ECR URI from above
-1. Enter a hard limit of 1024
-1. Enter 8080 for Host port and 80 for Container port in Port Mappings
-1. Click the Add button the bottom of the Add container pane
-1. Click the Create button on the bottom right
-1. Click the JSON tab - we could have written this ourselves or used CDK to generate it but the console can help us click around with what we want and it'll generate it for us too.
-1. Click on the `Actions` button and then choose `Create Service`
-1. Pick EXTERNAL for the `Launch type`
-1. Pick the `ECSAnywhere` cluster from the dropdown
-1. Enter `nyancat-external` for the `Service name`
-1. Enter 1 for the number of tasks
-1. Click the blue `Next step` button at the bottom
-1. Click the `Review and create` button
-1. Click the `Create Service` button
-1. Click the `View Service` button
-1. Once the Task has successfully started you should be able to see it on http://localhost:8080 from within Cloud9
